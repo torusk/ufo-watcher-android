@@ -1,8 +1,11 @@
 package com.example.ufowatcher
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.net.Uri
 import android.service.wallpaper.WallpaperService
 import android.view.MotionEvent
 import android.view.SurfaceHolder
@@ -60,6 +63,10 @@ class UfoWallpaperService : WallpaperService() {
         private var dragStartIdleX = 0f     // ドラッグ開始時のUFOのX座標
         private var dragStartIdleY = 0f     // ドラッグ開始時のUFOのY座標
         private var isDragging = false      // ドラッグ中かどうか
+
+        // ── 長押し検出用 ──────────────────────────────────────────────────
+        // ACTION_DOWN から600ms以内にドラッグも離しもしなければ長押しとみなす
+        private val longPressRunnable = Runnable { openUrl() }
 
         // ── 描画ループ（約60fps、Handler で繰り返し呼び出す） ────────────
         private val handler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -124,12 +131,18 @@ class UfoWallpaperService : WallpaperService() {
                     dragStartIdleX = idleX
                     dragStartIdleY = idleY
                     isDragging = false
+                    // 600ms 後に長押し判定（ドラッグ or ACTION_UP で事前キャンセル）
+                    handler.postDelayed(longPressRunnable, 600L)
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = event.x - dragStartTouchX
                     val dy = event.y - dragStartTouchY
                     // 閾値を超えたらドラッグとみなしてUFOを指に追従させる
                     if (isDragging || dx * dx + dy * dy > DRAG_THRESHOLD * DRAG_THRESHOLD) {
+                        if (!isDragging) {
+                            // ドラッグ開始が確定した瞬間に長押しタイマーをキャンセル
+                            handler.removeCallbacks(longPressRunnable)
+                        }
                         isDragging = true
                         // 画面外に出ないようにクランプ
                         idleX = (dragStartIdleX + dx).coerceIn(0f, screenW - UFO_SIZE)
@@ -137,6 +150,8 @@ class UfoWallpaperService : WallpaperService() {
                     }
                 }
                 MotionEvent.ACTION_UP -> {
+                    // 指を離したので長押しタイマーをキャンセル
+                    handler.removeCallbacks(longPressRunnable)
                     if (isDragging) {
                         // ドラッグ終了: 新しい位置を SharedPreferences に保存
                         this@UfoWallpaperService.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -201,6 +216,27 @@ class UfoWallpaperService : WallpaperService() {
 
         private fun stopWatcher() {
             stopWatcher = true
+        }
+
+        // ── 登録URLをChromeで開く（Chromeがなければデフォルトブラウザで開く） ──
+        private fun openUrl() {
+            val prefs = this@UfoWallpaperService.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            val url = prefs.getString(KEY_URL, "") ?: return
+            if (url.isEmpty()) return
+
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) // Serviceから起動するために必要
+                setPackage("com.android.chrome")        // Chrome指定
+            }
+            try {
+                this@UfoWallpaperService.startActivity(intent)
+            } catch (_: ActivityNotFoundException) {
+                // Chromeが見つからない場合はデフォルトブラウザにフォールバック
+                val fallback = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                this@UfoWallpaperService.startActivity(fallback)
+            }
         }
 
         // ── HTTPフェッチ（タイムアウト15秒） ─────────────────────────────
