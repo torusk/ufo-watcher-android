@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">UFO Watcher</string>
+    <string name="wallpaper_description">URLの変化をUFOアニメーションで通知するライブ壁紙</string>
+</resources>

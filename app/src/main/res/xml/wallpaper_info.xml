@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ライブ壁紙のメタデータ。AndroidManifest の <meta-data> から参照される -->
+<wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/wallpaper_description"
+    android:thumbnail="@mipmap/ic_launcher" />

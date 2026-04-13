@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🛸 UFO Watcher"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="URLが変化したらUFOが飛び出すライブ壁紙"
+        android:textSize="13sp"
+        android:textColor="#888888"
+        android:layout_marginBottom="32dp" />
+
+    <!-- 監視URL入力 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="監視URL"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <EditText
+        android:id="@+id/editUrl"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="textUri"
+        android:hint="https://example.com"
+        android:layout_marginBottom="24dp" />
+
+    <!-- ポーリング間隔入力 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ポーリング間隔（秒）"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <EditText
+        android:id="@+id/editInterval"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="number"
+        android:hint="60"
+        android:layout_marginBottom="32dp" />
+
+    <!-- 設定保存 -->
+    <Button
+        android:id="@+id/btnSave"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="設定を保存"
+        android:layout_marginBottom="12dp" />
+
+    <!-- ライブ壁紙として設定 -->
+    <Button
+        android:id="@+id/btnSetWallpaper"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ライブ壁紙として設定" />
+
+</LinearLayout>
