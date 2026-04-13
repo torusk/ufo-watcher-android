@@ -16,14 +16,17 @@ import kotlin.math.sin
 const val PREFS_NAME = "ufo_prefs"
 const val KEY_URL = "url"
 const val KEY_INTERVAL = "interval_sec"
+private const val KEY_IDLE_X = "idle_x"  // ユーザーが設定したアイドル位置X
+private const val KEY_IDLE_Y = "idle_y"  // ユーザーが設定したアイドル位置Y
 
 // アニメーション定数（inner class に companion object は置けないのでトップレベルに定義）
-private const val UFO_SIZE = 80f         // UFO絵文字の描画サイズ（px）
-private const val WOBBLE_AMP = 10f       // アイドル時の上下振幅（px）
-private const val WOBBLE_FREQ = 0.6      // アイドル時のホバー周波数（Hz）
-private const val FLY_SPEED = 1.2        // Lissajousパラメータの進み速度
-private const val FLY_DURATION = 5.0     // フライト最大継続時間（秒）
-private const val TICK_STEP = 1.0 / 60.0 // 1フレームあたりの時間（秒）
+private const val UFO_SIZE = 80f          // UFO絵文字の描画サイズ（px）
+private const val WOBBLE_AMP = 10f        // アイドル時の上下振幅（px）
+private const val WOBBLE_FREQ = 0.6       // アイドル時のホバー周波数（Hz）
+private const val FLY_SPEED = 1.2         // Lissajousパラメータの進み速度
+private const val FLY_DURATION = 5.0      // フライト最大継続時間（秒）
+private const val TICK_STEP = 1.0 / 60.0  // 1フレームあたりの時間（秒）
+private const val DRAG_THRESHOLD = 20f    // ドラッグ判定の最小移動距離（px）
 
 class UfoWallpaperService : WallpaperService() {
 
@@ -44,6 +47,19 @@ class UfoWallpaperService : WallpaperService() {
         // ── スクリーンサイズ（onSurfaceChanged で更新） ───────────────────
         private var screenW = 1080f
         private var screenH = 1920f
+
+        // ── アイドル位置（ドラッグで変更・SharedPreferencesに保存） ────────
+        // デフォルトは画面中央。onSurfaceChanged で実際の画面サイズに合わせて初期化
+        private var idleX = 0f
+        private var idleY = 0f
+        private var idleInitialized = false  // 初期化済みかどうかのフラグ
+
+        // ── ドラッグ追跡用 ────────────────────────────────────────────────
+        private var dragStartTouchX = 0f    // ドラッグ開始時の指のX座標
+        private var dragStartTouchY = 0f    // ドラッグ開始時の指のY座標
+        private var dragStartIdleX = 0f     // ドラッグ開始時のUFOのX座標
+        private var dragStartIdleY = 0f     // ドラッグ開始時のUFOのY座標
+        private var isDragging = false      // ドラッグ中かどうか
 
         // ── 描画ループ（約60fps、Handler で繰り返し呼び出す） ────────────
         private val handler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -76,6 +92,15 @@ class UfoWallpaperService : WallpaperService() {
             super.onSurfaceChanged(holder, format, width, height)
             screenW = width.toFloat()
             screenH = height.toFloat()
+
+            // アイドル位置の初期化（初回のみ）
+            // 保存済みの位置があればそれを使い、なければ画面中央をデフォルトにする
+            if (!idleInitialized) {
+                val prefs = this@UfoWallpaperService.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                idleX = prefs.getFloat(KEY_IDLE_X, (screenW - UFO_SIZE) / 2f)
+                idleY = prefs.getFloat(KEY_IDLE_Y, (screenH - UFO_SIZE) / 2f)
+                idleInitialized = true
+            }
         }
 
         override fun onVisibilityChanged(visible: Boolean) {
@@ -91,10 +116,41 @@ class UfoWallpaperService : WallpaperService() {
         }
 
         override fun onTouchEvent(event: MotionEvent) {
-            // 指を離したタイミング（ACTION_UP）でフライト中ならUFOを止める
-            if (event.action == MotionEvent.ACTION_UP && flying) {
-                flying = false
-                alertFlag = false
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    // 指を置いた瞬間: ドラッグ開始座標とUFOの現在位置を記録
+                    dragStartTouchX = event.x
+                    dragStartTouchY = event.y
+                    dragStartIdleX = idleX
+                    dragStartIdleY = idleY
+                    isDragging = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.x - dragStartTouchX
+                    val dy = event.y - dragStartTouchY
+                    // 閾値を超えたらドラッグとみなしてUFOを指に追従させる
+                    if (isDragging || dx * dx + dy * dy > DRAG_THRESHOLD * DRAG_THRESHOLD) {
+                        isDragging = true
+                        // 画面外に出ないようにクランプ
+                        idleX = (dragStartIdleX + dx).coerceIn(0f, screenW - UFO_SIZE)
+                        idleY = (dragStartIdleY + dy).coerceIn(0f, screenH - UFO_SIZE)
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (isDragging) {
+                        // ドラッグ終了: 新しい位置を SharedPreferences に保存
+                        this@UfoWallpaperService.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                            .edit()
+                            .putFloat(KEY_IDLE_X, idleX)
+                            .putFloat(KEY_IDLE_Y, idleY)
+                            .apply()
+                    } else if (flying) {
+                        // ドラッグなし＆フライト中 → タップでUFOを止める
+                        flying = false
+                        alertFlag = false
+                    }
+                    isDragging = false
+                }
             }
         }
 
@@ -213,10 +269,10 @@ class UfoWallpaperService : WallpaperService() {
                     ufoX = cx + (rx * sin(3 * flyT + PI / 2)).toFloat()
                     ufoY = cy + (ry * sin(2 * flyT)).toFloat()
                 } else {
-                    // アイドル: 右下でサイン波ホバー（±WOBBLE_AMP px）
+                    // アイドル: 保存済みの位置でサイン波ホバー（±WOBBLE_AMP px）
                     val dy = (WOBBLE_AMP * sin(2 * PI * WOBBLE_FREQ * tick)).toFloat()
-                    ufoX = screenW - UFO_SIZE - 40f
-                    ufoY = screenH - UFO_SIZE * 2.5f + dy
+                    ufoX = idleX
+                    ufoY = idleY + dy
                 }
 
                 // UFOを🛸絵文字で描画
