@@ -23,7 +23,7 @@
 
         <Button
             android:id="@+id/btnStartStop"
-            android:layout_width="72dp"
+            android:layout_width="88dp"
             android:layout_height="40dp"
             android:text="ON"
             android:textColor="#FFFFFF"

@@ -74,8 +74,10 @@ class MainActivity : AppCompatActivity() {
             }
             if (UfoOverlayService.instance != null) {
                 stopService(Intent(this, UfoOverlayService::class.java))
+                setStartStopButton(running = false)
             } else {
                 ContextCompat.startForegroundService(this, Intent(this, UfoOverlayService::class.java))
+                setStartStopButton(running = true)
             }
         }
     }
@@ -90,11 +92,14 @@ class MainActivity : AppCompatActivity() {
         btnOverlay.text = if (hasPermission) "オーバーレイ許可済み" else "オーバーレイを許可"
         btnOverlay.isEnabled = !hasPermission
 
-        val running = UfoOverlayService.instance != null
+        setStartStopButton(running = UfoOverlayService.instance != null)
+        btnStartStop.isEnabled = hasPermission
+    }
+
+    private fun setStartStopButton(running: Boolean) {
         btnStartStop.text = if (running) "OFF" else "ON"
         btnStartStop.backgroundTintList = ColorStateList.valueOf(
             if (running) Color.parseColor("#F44336") else Color.parseColor("#2196F3")
         )
-        btnStartStop.isEnabled = hasPermission
     }
 }

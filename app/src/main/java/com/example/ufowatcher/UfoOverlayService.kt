@@ -24,6 +24,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.sin
 
 // SharedPreferences キー（MainActivity・MenuActivity からも参照）
@@ -37,8 +38,8 @@ const val KEY_IDLE_Y   = "idle_y"
 private const val UFO_SIZE     = 80f
 private const val WOBBLE_AMP   = 10f
 private const val WOBBLE_FREQ  = 0.6
-private const val FLY_SPEED    = 1.2
-private const val FLY_DURATION = 5.0
+private const val FLY_DURATION = 3.0
+private val     FLY_SPEED    = 2.0 * PI / FLY_DURATION  // 3秒でちょうど一周
 private const val TICK_STEP    = 1.0 / 60.0
 private const val DRAG_THRESHOLD = 20f
 
@@ -203,11 +204,11 @@ class UfoOverlayService : Service() {
         // UFO 位置の計算
         if (flying) {
             flyT += TICK_STEP * FLY_SPEED
-            val margin = UFO_SIZE
-            val cx = (screenW - UFO_SIZE) / 2f
-            val cy = (screenH - UFO_SIZE) / 2f
-            ufoX = cx + ((cx - margin) * sin(3 * flyT + PI / 2)).toFloat()
-            ufoY = cy + ((cy - margin) * sin(2 * flyT)).toFloat()
+            val margin = UFO_SIZE * 1.5f
+            val rx = (screenW / 2f) - margin
+            val ry = (screenH / 2f) - margin
+            ufoX = (screenW - UFO_SIZE) / 2f + (rx * cos(flyT)).toFloat()
+            ufoY = (screenH - UFO_SIZE) / 2f + (ry * sin(flyT)).toFloat()
         } else {
             val dy = (WOBBLE_AMP * sin(2 * PI * WOBBLE_FREQ * tick)).toFloat()
             ufoX = idleX
