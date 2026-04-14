@@ -30,14 +30,7 @@
             </intent-filter>
         </activity>
 
-        <!-- UFOタップ時のメニュー。透明テーマでAlertDialogだけを表示する -->
-        <activity
-            android:name=".MenuActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Ufowatcher.Dialog"
-            android:excludeFromRecents="true" />
-
-        <!-- UFOオーバーレイサービス。フォアグラウンドサービスとして常駐する -->
+<!-- UFOオーバーレイサービス。フォアグラウンドサービスとして常駐する -->
         <service
             android:name=".UfoOverlayService"
             android:foregroundServiceType="specialUse"

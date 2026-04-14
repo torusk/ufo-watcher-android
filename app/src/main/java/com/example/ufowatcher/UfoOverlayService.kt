@@ -159,6 +159,25 @@ class UfoOverlayService : Service() {
         if (isMonitoring) stopWatcher() else startWatcher()
     }
 
+    private fun openUrl() {
+        val url = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getString(KEY_URL, "") ?: ""
+        if (url.isEmpty()) return
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            setPackage("com.android.chrome")
+        }
+        try {
+            startActivity(intent)
+        } catch (_: android.content.ActivityNotFoundException) {
+            startActivity(
+                Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            )
+        }
+    }
+
     // ── フレーム更新 ──────────────────────────────────────────────────────
 
     private fun updateFrame() {
@@ -339,11 +358,7 @@ class UfoOverlayService : Service() {
                             .apply()
                     } else {
                         alertState = false  // タップ = 確認済み
-                        startActivity(
-                            Intent(this@UfoOverlayService, MenuActivity::class.java).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                        )
+                        openUrl()
                     }
                     isDragging = false
                 }
