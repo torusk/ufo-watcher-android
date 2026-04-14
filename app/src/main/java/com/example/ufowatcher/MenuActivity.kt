@@ -26,7 +26,6 @@ class MenuActivity : AppCompatActivity() {
         val items = arrayOf(
             "リンクを開く",
             "URLを変更",
-            "飛行を停止",
             monitorLabel,
         )
 
@@ -36,8 +35,7 @@ class MenuActivity : AppCompatActivity() {
                 when (which) {
                     0 -> openUrl()
                     1 -> changeUrl()
-                    2 -> { service?.stopFlight(); finish() }
-                    3 -> { service?.toggleMonitoring(); finish() }
+                    2 -> { service?.toggleMonitoring(); finish() }
                 }
             }
             .setOnCancelListener { finish() }  // 背景タップやBackキーで閉じる

@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Point
@@ -64,6 +65,9 @@ class UfoOverlayService : Service() {
     private var flyT = 0.0
     private var flyElapsed = 0.0
     @Volatile private var alertFlag = false
+
+    // 変化を検出済みで未確認の状態（タップで解除）
+    @Volatile var alertState = false
 
     // アイドル位置（ドラッグで変更・保存）
     private var idleX = 0f
@@ -151,11 +155,6 @@ class UfoOverlayService : Service() {
 
     // ── MenuActivity から呼ばれる公開メソッド ─────────────────────────────
 
-    fun stopFlight() {
-        flying = false
-        alertFlag = false
-    }
-
     fun toggleMonitoring() {
         if (isMonitoring) stopWatcher() else startWatcher()
     }
@@ -225,6 +224,7 @@ class UfoOverlayService : Service() {
                     } else if (hash != prevHash) {
                         prevHash = hash
                         alertFlag = true
+                        alertState = true  // タップで確認するまで保持
                     }
                 } catch (_: Exception) {}
 
@@ -300,9 +300,16 @@ class UfoOverlayService : Service() {
             textAlign = Paint.Align.CENTER
         }
 
+        private val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.RED
+        }
+
         override fun onDraw(canvas: android.graphics.Canvas) {
-            // ウィンドウがUFO_SIZE×UFO_SIZEなので中央に描くだけ
             canvas.drawText("🛸", UFO_SIZE / 2f, UFO_SIZE, paint)
+            // 未確認の変化があれば右上に赤バッジを表示
+            if (alertState) {
+                canvas.drawCircle(UFO_SIZE * 0.82f, UFO_SIZE * 0.18f, UFO_SIZE * 0.16f, badgePaint)
+            }
         }
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -331,6 +338,7 @@ class UfoOverlayService : Service() {
                             .putFloat(KEY_IDLE_Y, idleY)
                             .apply()
                     } else {
+                        alertState = false  // タップ = 確認済み
                         startActivity(
                             Intent(this@UfoOverlayService, MenuActivity::class.java).apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
