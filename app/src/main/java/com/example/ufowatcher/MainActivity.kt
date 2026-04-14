@@ -1,8 +1,12 @@
 package com.example.ufowatcher
 
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Bundle
 import android.provider.Settings
+import android.text.Editable
+import android.text.TextWatcher
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
@@ -12,42 +16,48 @@ import androidx.core.net.toUri
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var btnOverlay: Button
     private lateinit var btnStartStop: Button
+    private lateinit var btnOverlay: Button
+    private lateinit var btnSave: Button
+    private lateinit var urlField: EditText
+    private var savedUrl = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val urlField = findViewById<EditText>(R.id.editUrl)
-        val intervalField = findViewById<EditText>(R.id.editInterval)
-        btnOverlay = findViewById(R.id.btnOverlayPermission)
+        urlField = findViewById(R.id.editUrl)
         btnStartStop = findViewById(R.id.btnStartStop)
+        btnOverlay = findViewById(R.id.btnOverlayPermission)
+        btnSave = findViewById(R.id.btnSave)
 
-        // 保存済みの設定値をフィールドに表示
-        urlField.setText(prefs.getString(KEY_URL, "https://example.com"))
-        intervalField.setText(prefs.getInt(KEY_INTERVAL, 60).toString())
+        // 保存済みURLを表示
+        savedUrl = prefs.getString(KEY_URL, "https://example.com") ?: "https://example.com"
+        urlField.setText(savedUrl)
 
-        // 「設定を保存」
-        findViewById<Button>(R.id.btnSave).setOnClickListener {
+        // 変更があるときだけ保存ボタンを有効に
+        btnSave.isEnabled = false
+        urlField.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                btnSave.isEnabled = s.toString().trim() != savedUrl
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
+        btnSave.setOnClickListener {
             val url = urlField.text.toString().trim()
-            val interval = intervalField.text.toString().toIntOrNull() ?: 60
-
             if (url.isEmpty()) {
                 Toast.makeText(this, "URLを入力してください", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-
-            prefs.edit()
-                .putString(KEY_URL, url)
-                .putInt(KEY_INTERVAL, interval)
-                .apply()
-
+            prefs.edit().putString(KEY_URL, url).apply()
+            savedUrl = url
+            btnSave.isEnabled = false
             Toast.makeText(this, "保存しました", Toast.LENGTH_SHORT).show()
         }
 
-        // 「オーバーレイを許可」: 権限設定画面を開く
         btnOverlay.setOnClickListener {
             startActivity(
                 Intent(
@@ -57,13 +67,11 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        // 「監視を開始 / 停止」
         btnStartStop.setOnClickListener {
             if (!Settings.canDrawOverlays(this)) {
                 Toast.makeText(this, "先にオーバーレイを許可してください", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-
             if (UfoOverlayService.instance != null) {
                 stopService(Intent(this, UfoOverlayService::class.java))
             } else {
@@ -83,7 +91,10 @@ class MainActivity : AppCompatActivity() {
         btnOverlay.isEnabled = !hasPermission
 
         val running = UfoOverlayService.instance != null
-        btnStartStop.text = if (running) "UFOを非表示" else "UFOを表示"
+        btnStartStop.text = if (running) "OFF" else "ON"
+        btnStartStop.backgroundTintList = ColorStateList.valueOf(
+            if (running) Color.parseColor("#F44336") else Color.parseColor("#2196F3")
+        )
         btnStartStop.isEnabled = hasPermission
     }
 }
