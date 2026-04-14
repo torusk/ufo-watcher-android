@@ -63,11 +63,19 @@
         android:text="設定を保存"
         android:layout_marginBottom="12dp" />
 
-    <!-- ライブ壁紙として設定 -->
+    <!-- オーバーレイ権限 -->
     <Button
-        android:id="@+id/btnSetWallpaper"
+        android:id="@+id/btnOverlayPermission"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="ライブ壁紙として設定" />
+        android:text="オーバーレイを許可"
+        android:layout_marginBottom="12dp" />
+
+    <!-- 監視の開始/停止 -->
+    <Button
+        android:id="@+id/btnStartStop"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="監視を開始" />
 
 </LinearLayout>

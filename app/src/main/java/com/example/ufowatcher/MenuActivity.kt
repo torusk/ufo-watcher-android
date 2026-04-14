@@ -18,10 +18,10 @@ class MenuActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val engine = UfoWallpaperService.engine
+        val service = UfoOverlayService.instance
 
         // 監視状態に応じてメニュー項目を動的に切り替える
-        val monitorLabel = if (engine?.isMonitoring == true) "監視を停止" else "監視を再開"
+        val monitorLabel = if (service?.isMonitoring == true) "監視を停止" else "監視を再開"
 
         val items = arrayOf(
             "リンクを開く",
@@ -36,8 +36,8 @@ class MenuActivity : AppCompatActivity() {
                 when (which) {
                     0 -> openUrl()
                     1 -> changeUrl()
-                    2 -> { engine?.stopFlight(); finish() }
-                    3 -> { engine?.toggleMonitoring(); finish() }
+                    2 -> { service?.stopFlight(); finish() }
+                    3 -> { service?.toggleMonitoring(); finish() }
                 }
             }
             .setOnCancelListener { finish() }  // 背景タップやBackキーで閉じる
