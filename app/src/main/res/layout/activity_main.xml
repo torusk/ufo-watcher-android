@@ -23,12 +23,12 @@
 
         <Button
             android:id="@+id/btnStartStop"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
+            android:layout_width="72dp"
+            android:layout_height="40dp"
             android:text="ON"
             android:textColor="#FFFFFF"
             android:textStyle="bold"
-            android:textSize="13sp"
+            android:textSize="14sp"
             android:background="@drawable/shape_circle"
             android:backgroundTint="#2196F3"
             android:elevation="4dp" />
