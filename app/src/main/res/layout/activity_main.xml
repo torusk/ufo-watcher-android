@@ -16,16 +16,24 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="URLが変化したらUFOが飛び出すライブ壁紙"
+        android:text="URLが変化したらUFOが飛び出すアプリ"
         android:textSize="13sp"
         android:textColor="#888888"
+        android:layout_marginBottom="24dp" />
+
+    <!-- UFO表示/非表示 -->
+    <Button
+        android:id="@+id/btnStartStop"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="UFOを表示"
         android:layout_marginBottom="32dp" />
 
-    <!-- 監視URL入力 -->
+    <!-- URL入力 -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="監視URL"
+        android:text="チェックするURL"
         android:textSize="14sp"
         android:textStyle="bold"
         android:layout_marginBottom="4dp" />
@@ -42,7 +50,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="ポーリング間隔（秒）"
+        android:text="チェック間隔（秒）"
         android:textSize="14sp"
         android:textStyle="bold"
         android:layout_marginBottom="4dp" />
@@ -68,14 +76,6 @@
         android:id="@+id/btnOverlayPermission"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="オーバーレイを許可"
-        android:layout_marginBottom="12dp" />
-
-    <!-- 監視の開始/停止 -->
-    <Button
-        android:id="@+id/btnStartStop"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="監視を開始" />
+        android:text="オーバーレイを許可" />
 
 </LinearLayout>

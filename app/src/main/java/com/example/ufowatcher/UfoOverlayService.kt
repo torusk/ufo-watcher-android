@@ -277,8 +277,8 @@ class UfoOverlayService : Service() {
         )
 
         val notif = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("UFO監視中")
-            .setContentText("URLの変化を監視しています")
+            .setContentTitle("UFO Watcher 起動中")
+            .setContentText("URLの変化をチェックしています")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pi)
             .setOngoing(true)

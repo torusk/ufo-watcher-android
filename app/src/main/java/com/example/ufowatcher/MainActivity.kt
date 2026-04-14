@@ -83,7 +83,7 @@ class MainActivity : AppCompatActivity() {
         btnOverlay.isEnabled = !hasPermission
 
         val running = UfoOverlayService.instance != null
-        btnStartStop.text = if (running) "監視を停止" else "監視を開始"
+        btnStartStop.text = if (running) "UFOを非表示" else "UFOを表示"
         btnStartStop.isEnabled = hasPermission
     }
 }
