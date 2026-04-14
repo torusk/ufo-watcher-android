@@ -79,12 +79,12 @@ class UfoOverlayService : Service() {
     private var dragStartIdleY = 0f
     private var isDragging     = false
 
-    // 描画ループ（60fps）
+    // 描画ループ（飛行中60fps・アイドル時10fps）
     private val handler = Handler(Looper.getMainLooper())
     private val drawRunnable = object : Runnable {
         override fun run() {
             updateFrame()
-            handler.postDelayed(this, 16L)
+            handler.postDelayed(this, if (flying) 16L else 100L)
         }
     }
 
