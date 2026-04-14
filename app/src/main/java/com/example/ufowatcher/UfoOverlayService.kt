@@ -4,13 +4,14 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PixelFormat
-import android.graphics.Point
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -27,21 +28,20 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-// SharedPreferences キー（MainActivity・MenuActivity からも参照）
-const val PREFS_NAME   = "ufo_prefs"
-const val KEY_URL      = "url"
-const val KEY_INTERVAL = "interval_sec"
-const val KEY_IDLE_X   = "idle_x"
-const val KEY_IDLE_Y   = "idle_y"
+// SharedPreferences キー
+const val PREFS_NAME = "ufo_prefs"
+const val KEY_URL    = "url"
+const val KEY_IDLE_X = "idle_x"
+const val KEY_IDLE_Y = "idle_y"
 
-// アニメーション定数
-private const val UFO_SIZE     = 80f
-private const val WOBBLE_AMP   = 10f
-private const val WOBBLE_FREQ  = 0.6
-private const val FLY_DURATION = 3.0
-private val     FLY_SPEED    = 2.0 * PI / FLY_DURATION  // 3秒でちょうど一周
-private const val TICK_STEP    = 1.0 / 60.0
+private const val UFO_SIZE       = 80f
+private const val WOBBLE_AMP     = 10f
+private const val WOBBLE_FREQ    = 0.6
+private const val FLY_DURATION   = 3.0
+private val       FLY_SPEED      = 2.0 * PI / FLY_DURATION  // 3秒でちょうど一周
+private const val TICK_STEP      = 1.0 / 60.0
 private const val DRAG_THRESHOLD = 20f
+private const val POLL_INTERVAL  = 60_000L  // ポーリング間隔（ms）
 
 private const val CHANNEL_ID = "ufo_watcher"
 private const val NOTIF_ID   = 1
@@ -56,35 +56,30 @@ class UfoOverlayService : Service() {
     private lateinit var ufoView: UfoView
     private lateinit var layoutParams: WindowManager.LayoutParams
 
-    // スクリーンサイズ
     private var screenW = 0f
     private var screenH = 0f
 
     // アニメーション状態（すべてメインスレッドから操作）
-    private var tick = 0.0
-    private var flying = false
-    private var flyT = 0.0
+    private var tick       = 0.0
+    private var flying     = false
+    private var flyT       = 0.0
     private var flyElapsed = 0.0
 
-    // 変化を検出済みで未確認の状態（タップで解除）
+    // 未確認の変化あり（タップで解除）
     var alertState = false
 
-    // アイドル位置（ドラッグで変更・保存）
+    // アイドル位置
     private var idleX = 0f
     private var idleY = 0f
 
     // ドラッグ状態
-    private var dragStartRawX = 0f
-    private var dragStartRawY = 0f
+    private var dragStartRawX  = 0f
+    private var dragStartRawY  = 0f
     private var dragStartIdleX = 0f
     private var dragStartIdleY = 0f
-    private var isDragging = false
+    private var isDragging     = false
 
-    // 現フレームのUFO描画位置（tick() で更新、onDraw で参照）
-    private var ufoX = 0f
-    private var ufoY = 0f
-
-    // 描画ループ（約60fps）
+    // 描画ループ（60fps）
     private val handler = Handler(Looper.getMainLooper())
     private val drawRunnable = object : Runnable {
         override fun run() {
@@ -93,13 +88,10 @@ class UfoOverlayService : Service() {
         }
     }
 
-    // URLポーリングスレッド
+    // ポーリングスレッド
     @Volatile private var watcherStopped = false
-    private var watcherThread: Thread? = null
-    private var prevHash: String? = null
-
-    var isMonitoring = false
-        private set
+    @Volatile private var isMonitoring   = false
+    private var prevHash: String?        = null
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -109,32 +101,24 @@ class UfoOverlayService : Service() {
 
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
-        // スクリーンサイズ取得
-        val pt = Point()
-        @Suppress("DEPRECATION")
-        windowManager.defaultDisplay.getSize(pt)
-        screenW = pt.x.toFloat()
-        screenH = pt.y.toFloat()
+        val dm = resources.displayMetrics
+        screenW = dm.widthPixels.toFloat()
+        screenH = dm.heightPixels.toFloat()
 
-        // アイドル位置を読み込み（なければ中央）
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         idleX = prefs.getFloat(KEY_IDLE_X, (screenW - UFO_SIZE) / 2f)
         idleY = prefs.getFloat(KEY_IDLE_Y, (screenH - UFO_SIZE) / 2f)
-        ufoX = idleX
-        ufoY = idleY
 
-        // UFO の小ウィンドウを作成（UFO_SIZE × UFO_SIZE）
         ufoView = UfoView(this)
         layoutParams = WindowManager.LayoutParams(
-            UFO_SIZE.toInt(),
-            UFO_SIZE.toInt(),
+            UFO_SIZE.toInt(), UFO_SIZE.toInt(),
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = ufoX.toInt()
-            y = ufoY.toInt()
+            x = idleX.toInt()
+            y = idleY.toInt()
         }
         windowManager.addView(ufoView, layoutParams)
 
@@ -145,7 +129,7 @@ class UfoOverlayService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacks(drawRunnable)
-        stopWatcher()
+        watcherStopped = true
         if (::ufoView.isInitialized) windowManager.removeView(ufoView)
         instance = null
         super.onDestroy()
@@ -153,98 +137,68 @@ class UfoOverlayService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    // ── MenuActivity から呼ばれる公開メソッド ─────────────────────────────
-
-    fun toggleMonitoring() {
-        if (isMonitoring) stopWatcher() else startWatcher()
-    }
-
-    private fun openUrl() {
-        val url = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            .getString(KEY_URL, "") ?: ""
-        if (url.isEmpty()) return
-        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            setPackage("com.android.chrome")
-        }
-        try {
-            startActivity(intent)
-        } catch (_: android.content.ActivityNotFoundException) {
-            startActivity(
-                Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
-        }
-    }
-
-    // ── フライト開始（ワッチャースレッドから handler.post で呼ばれる） ───────
+    // ── フライト開始（ポーリングスレッドから handler.post で呼ばれる） ───────
 
     private fun startFlight() {
         alertState = true
-        flying = true
-        flyT = 0.0
+        flying     = true
+        flyT       = 0.0
         flyElapsed = 0.0
     }
 
-    // ── フレーム更新 ──────────────────────────────────────────────────────
+    // ── 描画フレーム ──────────────────────────────────────────────────────────
 
     private fun updateFrame() {
         tick += TICK_STEP
 
-        // フライト継続時間の管理
         if (flying) {
             flyElapsed += TICK_STEP
             if (flyElapsed >= FLY_DURATION) flying = false
         }
 
-        // UFO 位置の計算
         if (flying) {
             flyT += TICK_STEP * FLY_SPEED
             val margin = UFO_SIZE * 1.5f
-            val rx = (screenW / 2f) - margin
-            val ry = (screenH / 2f) - margin
-            ufoX = (screenW - UFO_SIZE) / 2f + (rx * cos(flyT)).toFloat()
-            ufoY = (screenH - UFO_SIZE) / 2f + (ry * sin(flyT)).toFloat()
+            ufoX = (screenW - UFO_SIZE) / 2f + ((screenW / 2f - margin) * cos(flyT)).toFloat()
+            ufoY = (screenH - UFO_SIZE) / 2f + ((screenH / 2f - margin) * sin(flyT)).toFloat()
         } else {
-            val dy = (WOBBLE_AMP * sin(2 * PI * WOBBLE_FREQ * tick)).toFloat()
             ufoX = idleX
-            ufoY = idleY + dy
+            ufoY = idleY + (WOBBLE_AMP * sin(2 * PI * WOBBLE_FREQ * tick)).toFloat()
         }
 
-        // ウィンドウ位置を更新してUFOを移動
         layoutParams.x = ufoX.toInt()
         layoutParams.y = ufoY.toInt()
         windowManager.updateViewLayout(ufoView, layoutParams)
         ufoView.invalidate()
     }
 
-    // ── URLポーリング ─────────────────────────────────────────────────────
+    private var ufoX = 0f
+    private var ufoY = 0f
+
+    // ── URLポーリング ─────────────────────────────────────────────────────────
 
     private fun startWatcher() {
         if (isMonitoring) return
         watcherStopped = false
-        prevHash = null
-        isMonitoring = true
+        prevHash       = null
+        isMonitoring   = true
 
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val url = prefs.getString(KEY_URL, "https://example.com") ?: "https://example.com"
-        val intervalSec = prefs.getInt(KEY_INTERVAL, 60).toLong()
+        val url = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getString(KEY_URL, "https://example.com") ?: "https://example.com"
 
-        watcherThread = Thread {
+        Thread {
             while (!watcherStopped) {
                 try {
-                    val body = fetchBody(url)
-                    val hash = sha256(body)
+                    val hash = sha256(fetchBody(url))
                     if (prevHash == null) {
                         prevHash = hash
                     } else if (hash != prevHash) {
                         prevHash = hash
-                        handler.post { startFlight() }  // 検知と同時にメインスレッドで即起動
+                        handler.post { startFlight() }
                     }
                 } catch (_: Exception) {}
 
-                val deadline = System.currentTimeMillis() + intervalSec * 1000L
+                val deadline = System.currentTimeMillis() + POLL_INTERVAL
                 while (!watcherStopped && System.currentTimeMillis() < deadline) {
                     Thread.sleep(500)
                 }
@@ -256,14 +210,10 @@ class UfoOverlayService : Service() {
         }
     }
 
-    private fun stopWatcher() {
-        watcherStopped = true
-    }
-
     private fun fetchBody(urlStr: String): String {
         val conn = URL(urlStr).openConnection() as HttpURLConnection
         conn.connectTimeout = 15_000
-        conn.readTimeout = 15_000
+        conn.readTimeout    = 15_000
         conn.setRequestProperty("User-Agent", "ufo-watcher-android/1.0")
         return try {
             conn.inputStream.bufferedReader().readText()
@@ -272,26 +222,42 @@ class UfoOverlayService : Service() {
         }
     }
 
-    private fun sha256(text: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(text.toByteArray())
-        return bytes.joinToString("") { "%02x".format(it) }
+    private fun sha256(text: String): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(text.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+
+    // ── URL を開く ────────────────────────────────────────────────────────────
+
+    private fun openUrl() {
+        val url = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getString(KEY_URL, "") ?: ""
+        if (url.isEmpty()) return
+        val uri = Uri.parse(url)
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                setPackage("com.android.chrome")
+            })
+        } catch (_: ActivityNotFoundException) {
+            startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        }
     }
 
-    // ── 通知・フォアグラウンド起動 ────────────────────────────────────────
+    // ── 通知 ──────────────────────────────────────────────────────────────────
 
     private fun startForegroundWithNotification() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val ch = NotificationChannel(CHANNEL_ID, "UFO Watcher", NotificationManager.IMPORTANCE_LOW)
-            nm.createNotificationChannel(ch)
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "UFO Watcher", NotificationManager.IMPORTANCE_LOW)
+            )
         }
-
         val pi = PendingIntent.getActivity(
-            this, 0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE
+            this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
-
         val notif = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("UFO Watcher 起動中")
             .setContentText("URLの変化をチェックしています")
@@ -307,22 +273,20 @@ class UfoOverlayService : Service() {
         }
     }
 
-    // ── UFO描画View ───────────────────────────────────────────────────────
+    // ── UFO描画View ───────────────────────────────────────────────────────────
 
     inner class UfoView(context: Context) : View(context) {
 
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = UFO_SIZE
+        private val ufoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize  = UFO_SIZE
             textAlign = Paint.Align.CENTER
         }
-
         private val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.RED
         }
 
         override fun onDraw(canvas: android.graphics.Canvas) {
-            canvas.drawText("🛸", UFO_SIZE / 2f, UFO_SIZE, paint)
-            // 未確認の変化があれば右上に赤バッジを表示
+            canvas.drawText("🛸", UFO_SIZE / 2f, UFO_SIZE, ufoPaint)
             if (alertState) {
                 canvas.drawCircle(UFO_SIZE * 0.82f, UFO_SIZE * 0.18f, UFO_SIZE * 0.16f, badgePaint)
             }
@@ -331,11 +295,11 @@ class UfoOverlayService : Service() {
         override fun onTouchEvent(event: MotionEvent): Boolean {
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    dragStartRawX = event.rawX
-                    dragStartRawY = event.rawY
+                    dragStartRawX  = event.rawX
+                    dragStartRawY  = event.rawY
                     dragStartIdleX = idleX
                     dragStartIdleY = idleY
-                    isDragging = false
+                    isDragging     = false
                     return true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -354,7 +318,7 @@ class UfoOverlayService : Service() {
                             .putFloat(KEY_IDLE_Y, idleY)
                             .apply()
                     } else {
-                        alertState = false  // タップ = 確認済み
+                        alertState = false
                         openUrl()
                     }
                     isDragging = false

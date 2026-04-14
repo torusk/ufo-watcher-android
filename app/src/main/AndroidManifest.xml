@@ -30,7 +30,7 @@
             </intent-filter>
         </activity>
 
-<!-- UFOオーバーレイサービス。フォアグラウンドサービスとして常駐する -->
+        <!-- UFOオーバーレイサービス。フォアグラウンドサービスとして常駐する -->
         <service
             android:name=".UfoOverlayService"
             android:foregroundServiceType="specialUse"

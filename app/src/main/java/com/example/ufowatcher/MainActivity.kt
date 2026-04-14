@@ -5,14 +5,13 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
 import android.provider.Settings
-import android.text.Editable
-import android.text.TextWatcher
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.core.widget.doAfterTextChanged
 
 class MainActivity : AppCompatActivity() {
 
@@ -26,25 +25,19 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        urlField = findViewById(R.id.editUrl)
+        urlField     = findViewById(R.id.editUrl)
         btnStartStop = findViewById(R.id.btnStartStop)
-        btnOverlay = findViewById(R.id.btnOverlayPermission)
-        btnSave = findViewById(R.id.btnSave)
+        btnOverlay   = findViewById(R.id.btnOverlayPermission)
+        btnSave      = findViewById(R.id.btnSave)
 
-        // 保存済みURLを表示
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         savedUrl = prefs.getString(KEY_URL, "https://example.com") ?: "https://example.com"
         urlField.setText(savedUrl)
 
-        // 変更があるときだけ保存ボタンを有効に
         btnSave.isEnabled = false
-        urlField.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) {
-                btnSave.isEnabled = s.toString().trim() != savedUrl
-            }
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-        })
+        urlField.doAfterTextChanged { s ->
+            btnSave.isEnabled = s.toString().trim() != savedUrl
+        }
 
         btnSave.setOnClickListener {
             val url = urlField.text.toString().trim()
@@ -59,12 +52,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnOverlay.setOnClickListener {
-            startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    "package:$packageName".toUri()
-                )
-            )
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:$packageName".toUri()))
         }
 
         btnStartStop.setOnClickListener {
@@ -84,14 +72,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        updateButtons()
-    }
-
-    private fun updateButtons() {
         val hasPermission = Settings.canDrawOverlays(this)
-        btnOverlay.text = if (hasPermission) "オーバーレイ許可済み" else "オーバーレイを許可"
+        btnOverlay.text      = if (hasPermission) "オーバーレイ許可済み" else "オーバーレイを許可"
         btnOverlay.isEnabled = !hasPermission
-
         setStartStopButton(running = UfoOverlayService.instance != null)
         btnStartStop.isEnabled = hasPermission
     }
