@@ -39,10 +39,10 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            prefs.edit {
-                putString(KEY_URL, url)
-                putInt(KEY_INTERVAL, interval)
-            }
+            prefs.edit()
+                .putString(KEY_URL, url)
+                .putInt(KEY_INTERVAL, interval)
+                .apply()
 
             Toast.makeText(this, "保存しました", Toast.LENGTH_SHORT).show()
         }
