@@ -1,14 +1,14 @@
 package com.example.ufowatcher
 
 import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 
 class MainActivity : AppCompatActivity() {
 
@@ -39,38 +39,36 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            prefs.edit()
-                .putString(KEY_URL, url)
-                .putInt(KEY_INTERVAL, interval)
-                .apply()
+            prefs.edit {
+                putString(KEY_URL, url)
+                putInt(KEY_INTERVAL, interval)
+            }
 
             Toast.makeText(this, "保存しました", Toast.LENGTH_SHORT).show()
         }
 
         // 「オーバーレイを許可」: 権限設定画面を開く
         btnOverlay.setOnClickListener {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    "package:$packageName".toUri()
+                )
             )
-            startActivity(intent)
         }
 
         // 「監視を開始 / 停止」
         btnStartStop.setOnClickListener {
-            if (!canDrawOverlays()) {
+            if (!Settings.canDrawOverlays(this)) {
                 Toast.makeText(this, "先にオーバーレイを許可してください", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
             if (UfoOverlayService.instance != null) {
-                // 実行中 → 停止
                 stopService(Intent(this, UfoOverlayService::class.java))
             } else {
-                // 停止中 → 開始
-                startForegroundService(Intent(this, UfoOverlayService::class.java))
+                ContextCompat.startForegroundService(this, Intent(this, UfoOverlayService::class.java))
             }
-            // ボタンテキストは onResume で更新
         }
     }
 
@@ -80,7 +78,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateButtons() {
-        val hasPermission = canDrawOverlays()
+        val hasPermission = Settings.canDrawOverlays(this)
         btnOverlay.text = if (hasPermission) "オーバーレイ許可済み" else "オーバーレイを許可"
         btnOverlay.isEnabled = !hasPermission
 
@@ -88,7 +86,4 @@ class MainActivity : AppCompatActivity() {
         btnStartStop.text = if (running) "監視を停止" else "監視を開始"
         btnStartStop.isEnabled = hasPermission
     }
-
-    private fun canDrawOverlays(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)
 }
