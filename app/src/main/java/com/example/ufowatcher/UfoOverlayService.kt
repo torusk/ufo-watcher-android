@@ -60,15 +60,14 @@ class UfoOverlayService : Service() {
     private var screenW = 0f
     private var screenH = 0f
 
-    // アニメーション状態
+    // アニメーション状態（すべてメインスレッドから操作）
     private var tick = 0.0
     private var flying = false
     private var flyT = 0.0
     private var flyElapsed = 0.0
-    @Volatile private var alertFlag = false
 
     // 変化を検出済みで未確認の状態（タップで解除）
-    @Volatile var alertState = false
+    var alertState = false
 
     // アイドル位置（ドラッグで変更・保存）
     private var idleX = 0f
@@ -179,26 +178,24 @@ class UfoOverlayService : Service() {
         }
     }
 
+    // ── フライト開始（ワッチャースレッドから handler.post で呼ばれる） ───────
+
+    private fun startFlight() {
+        alertState = true
+        flying = true
+        flyT = 0.0
+        flyElapsed = 0.0
+    }
+
     // ── フレーム更新 ──────────────────────────────────────────────────────
 
     private fun updateFrame() {
         tick += TICK_STEP
 
-        // フライト状態の更新
-        if (alertFlag) {
-            if (!flying) {
-                flying = true
-                flyT = 0.0
-                flyElapsed = 0.0
-            } else {
-                flyElapsed += TICK_STEP
-                if (flyElapsed >= FLY_DURATION) {
-                    flying = false
-                    alertFlag = false
-                }
-            }
-        } else {
-            flying = false
+        // フライト継続時間の管理
+        if (flying) {
+            flyElapsed += TICK_STEP
+            if (flyElapsed >= FLY_DURATION) flying = false
         }
 
         // UFO 位置の計算
@@ -243,8 +240,7 @@ class UfoOverlayService : Service() {
                         prevHash = hash
                     } else if (hash != prevHash) {
                         prevHash = hash
-                        alertFlag = true
-                        alertState = true  // タップで確認するまで保持
+                        handler.post { startFlight() }  // 検知と同時にメインスレッドで即起動
                     }
                 } catch (_: Exception) {}
 
