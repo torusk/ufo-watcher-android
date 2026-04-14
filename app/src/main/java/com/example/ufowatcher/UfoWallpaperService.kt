@@ -13,14 +13,7 @@ import java.security.MessageDigest
 import kotlin.math.PI
 import kotlin.math.sin
 
-// SharedPreferences のキー（MainActivity・MenuActivity からも参照する）
-const val PREFS_NAME = "ufo_prefs"
-const val KEY_URL = "url"
-const val KEY_INTERVAL = "interval_sec"
-private const val KEY_IDLE_X = "idle_x"  // ユーザーが設定したアイドル位置X
-private const val KEY_IDLE_Y = "idle_y"  // ユーザーが設定したアイドル位置Y
-
-// アニメーション定数（inner class に companion object は置けないのでトップレベルに定義）
+// アニメーション定数
 private const val UFO_SIZE = 80f          // UFO絵文字の描画サイズ（px）
 private const val WOBBLE_AMP = 10f        // アイドル時の上下振幅（px）
 private const val WOBBLE_FREQ = 0.6       // アイドル時のホバー周波数（Hz）
